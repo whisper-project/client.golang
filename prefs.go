@@ -46,7 +46,7 @@ func (p *Prefs) post() error {
 	if err != nil {
 		return err
 	}
-	url := apiRoot + "/api/prefs"
+	url := apiRoot + "/client/prefs"
 	resp, err := http.Post(url, "application/json", bytes.NewReader(payload))
 	if err != nil {
 		return err
