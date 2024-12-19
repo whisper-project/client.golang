@@ -20,6 +20,8 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/term"
+
+	"github.com/whisper-project/client.go/api"
 )
 
 var (
@@ -29,14 +31,7 @@ var (
 	UserCancelled = errors.New("user cancelled")
 )
 
-type Prefs struct {
-	ClientId      string `json:"clientId"`
-	ProfileId     string `json:"profileId"`
-	ProfileSecret string `json:"profileSecret"`
-	ProfileEmail  string `json:"profileEmail"`
-	TypingOn      bool   `json:"typingOn"`
-	SpeakingOn    bool   `json:"speakingOn"`
-}
+type Prefs api.Prefs
 
 func (p *Prefs) save() error {
 	payload, err := json.Marshal(p)
