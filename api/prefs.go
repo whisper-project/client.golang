@@ -11,6 +11,5 @@ type Prefs struct {
 	ProfileId     string `json:"profileId"`
 	ProfileSecret string `json:"profileSecret"`
 	ProfileEmail  string `json:"profileEmail"`
-	TypingOn      bool   `json:"typingOn"`
 	SpeakingOn    bool   `json:"speakingOn"`
 }

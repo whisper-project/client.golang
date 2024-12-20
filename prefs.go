@@ -7,11 +7,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -25,10 +25,8 @@ import (
 )
 
 var (
-	homeDir       = os.Getenv("HOME")
-	prefsPath     = path.Join(homeDir, ".whisper")
-	apiRoot       = "http://localhost:8080/api/console/v0"
-	UserCancelled = errors.New("user cancelled")
+	homeDir   = os.Getenv("HOME")
+	prefsPath = path.Join(homeDir, ".whisper")
 )
 
 type Prefs api.Prefs
@@ -46,10 +44,10 @@ func (p *Prefs) post() error {
 	if err != nil {
 		return err
 	}
-	url := apiRoot + "/client/prefs"
+	url := fmt.Sprintf("%s/preferences", apiRoot)
 	resp, err := http.Post(url, "application/json", bytes.NewReader(payload))
 	if err != nil {
-		return err
+		return newNetworkError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusConflict {
@@ -59,13 +57,12 @@ func (p *Prefs) post() error {
 		var prefs Prefs
 		err = json.NewDecoder(resp.Body).Decode(&prefs)
 		if err != nil {
-			return err
+			return newJsonError(err)
 		}
 		*p = prefs
 		return nil
 	}
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("unexpected response %d: %s", resp.StatusCode, string(body))
+	return newServerError(resp.StatusCode, resp.Body)
 }
 
 func (p *Prefs) validate() error {
@@ -85,7 +82,7 @@ func (p *Prefs) validate() error {
 }
 
 func NewPrefs() *Prefs {
-	return &Prefs{ClientId: uuid.NewString(), TypingOn: true}
+	return &Prefs{ClientId: uuid.NewString()}
 }
 
 func LoadPrefs() (*Prefs, error) {
@@ -127,17 +124,22 @@ func collectEmail() (string, error) {
 		var email string
 		_, err := fmt.Scanln(&email)
 		if err != nil {
-			return "", err
+			return "", userCancelledError("Interrupt received!")
+		}
+		email = strings.TrimSpace(strings.ToLower(email))
+		if email == "" {
+			fmt.Println("Sorry, you must enter an email, or 'help' for help.")
+			continue
 		}
 		if email == "help" {
 			fmt.Println("Every user's profile is tied to their email address.")
 			fmt.Println("If you don't already have a profile, one will be created for you.")
 			fmt.Println("If you already have a profile, you'll enter your password to use it on this device.")
-			fmt.Println("If you don't want to continue now, enter 'exit' to quit.")
+			fmt.Println("If you don't want to continue now, enter 'quit' to quit.")
 			continue
 		}
-		if email == "exit" {
-			return "", UserCancelled
+		if email == "quit" || email == "exit" {
+			return "", newUserCancelledError("Quit!")
 		}
 		if re.MatchString(email) {
 			return email, nil
@@ -152,11 +154,11 @@ func collectPassword(repeat bool) (string, error) {
 	}
 	for {
 		fmt.Print("Enter your password (or 'help' for help): ")
-		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		password, err := readPassword()
 		if err != nil {
-			return "", err
+			return "", userCancelledError("Interrupt received!")
 		}
-		password := strings.TrimSpace(string(b))
+		password = strings.TrimSpace(password)
 		if password == "" {
 			fmt.Println("Sorry, you must enter a password, or 'help' for help.")
 			continue
@@ -164,11 +166,11 @@ func collectPassword(repeat bool) (string, error) {
 		if strings.ToLower(password) == "help" {
 			fmt.Println("Enter the password you were shown when you registered your account.")
 			fmt.Println("If you forgot your password, enter 'email' to have it mailed to you.")
-			fmt.Println("If you don't want to continue now, enter 'exit' to quit.")
+			fmt.Println("If you don't want to continue now, enter 'quit' to quit.")
 			continue
 		}
-		if strings.ToLower(password) == "exit" {
-			return "", UserCancelled
+		if strings.ToLower(password) == "quit" || strings.ToLower(password) == "exit" {
+			return "", newUserCancelledError("Quit!")
 		}
 		if strings.ToLower(password) == "email" {
 			fmt.Println("Sorry, this feature is not yet implemented.")
@@ -176,4 +178,25 @@ func collectPassword(repeat bool) (string, error) {
 		}
 		return password, nil
 	}
+}
+
+func readPassword() (string, error) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		s, err := term.GetState(int(os.Stdin.Fd()))
+		if err != nil {
+			log.Fatalf("Couldn't get terminal state: %v", err)
+		}
+		defer term.Restore(int(os.Stdin.Fd()), s)
+		pw, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", userCancelledError("Interrupt received!")
+		}
+		return string(pw), nil
+	}
+	input := bufio.NewReader(os.Stdin)
+	pw, err := input.ReadString('\n')
+	if err != nil {
+		return "", userCancelledError(err.Error())
+	}
+	return strings.TrimSuffix(pw, "\n"), nil
 }
