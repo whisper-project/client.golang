@@ -16,6 +16,7 @@ func processCommand(prefs *Prefs, cmd string, rest string) error {
 	case "help":
 		fmt.Println("> Available commands:")
 		fmt.Println("> /help: show this help")
+		fmt.Println("> /nwc <name>: new whisper conversation")
 		fmt.Println("> /quit: exit the program")
 		fmt.Println("> /wc: show whisper conversations")
 	case "wc":

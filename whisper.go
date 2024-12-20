@@ -41,6 +41,9 @@ func newWhisperConversation(pId, name string) (string, error) {
 		return "", newNetworkError(err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusConflict {
+		return "", fmt.Errorf("whisper conversation %q already exists", name)
+	}
 	if resp.StatusCode != http.StatusCreated {
 		return "", newServerError(resp.StatusCode, resp.Body)
 	}
