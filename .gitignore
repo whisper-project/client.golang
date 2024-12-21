@@ -2,7 +2,7 @@
 local/
 
 # main module file
-client.go
+client.golang
 
 # Binaries for programs and plugins
 *.exe

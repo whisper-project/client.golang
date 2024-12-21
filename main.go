@@ -22,9 +22,9 @@ func main() {
 	log.SetFlags(0)
 	prefs, err := LoadPrefs()
 	if err != nil {
-		log.Fatalf("Couldn't load preferences: %v", err)
+		log.Fatalf("> Couldn't load preferences: %v", err)
 	}
-	log.Printf("Loaded profile ID: %s", prefs.ProfileId)
+	log.Printf("> Loaded profile ID %s for user %s", prefs.ProfileId, prefs.ProfileEmail)
 	err = processInput(prefs)
 	if err != nil {
 		log.Fatal(err)
@@ -44,7 +44,7 @@ func processInput(prefs *Prefs) error {
 				return nil
 			}
 			if cmd == "" {
-				fmt.Println("No command specified; type '/help' for help")
+				fmt.Println("> No command specified; type '/help' for help")
 				continue
 			}
 			if err := processCommand(prefs, strings.ToLower(cmd), rest); err != nil {

@@ -20,7 +20,7 @@ func processCommand(prefs *Prefs, cmd string, rest string) error {
 		fmt.Println("> /quit: exit the program")
 		fmt.Println("> /wc: show whisper conversations")
 	case "wc":
-		m, err := getWhisperConversations(prefs.ProfileId)
+		m, err := getWhisperConversations(prefs)
 		if err != nil {
 			fmt.Println("> Error getting whisper conversations:", err)
 			return nil
@@ -42,7 +42,7 @@ func processCommand(prefs *Prefs, cmd string, rest string) error {
 			fmt.Println("> Names cannot contain spaces.\n> Usage: /nwc <name>")
 			return nil
 		}
-		id, err := newWhisperConversation(prefs.ProfileId, words[0])
+		id, err := newWhisperConversation(prefs, words[0])
 		if err != nil {
 			fmt.Println("> Error creating whisper conversation:", err)
 			return nil

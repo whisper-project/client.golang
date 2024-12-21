@@ -7,15 +7,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 )
 
-func getWhisperConversations(pId string) (map[string]string, error) {
-	url := fmt.Sprintf("%s/profiles/%s/whisper-conversations", apiRoot, pId)
-	resp, err := http.Get(url)
+func getWhisperConversations(p *Prefs) (map[string]string, error) {
+	path := fmt.Sprintf("/profiles/%s/whisper-conversations", p.ProfileId)
+	resp, err := SendRequest(p, path, "GET", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -30,13 +29,9 @@ func getWhisperConversations(pId string) (map[string]string, error) {
 	return result, nil
 }
 
-func newWhisperConversation(pId, name string) (string, error) {
-	url := fmt.Sprintf("%s/profiles/%s/whisper-conversations", apiRoot, pId)
-	body, err := json.Marshal(name)
-	if err != nil {
-		return "", newJsonError(err)
-	}
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+func newWhisperConversation(p *Prefs, name string) (string, error) {
+	url := fmt.Sprintf("/profiles/%s/whisper-conversations", p.ProfileId)
+	resp, err := SendRequest(p, url, "POST", nil, name)
 	if err != nil {
 		return "", newNetworkError(err)
 	}

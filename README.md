@@ -1,2 +1,2 @@
-# client.go
+# client.golang
 Console Whisper app

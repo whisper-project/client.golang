@@ -40,7 +40,7 @@ type networkError struct {
 }
 
 func (e *networkError) Error() string {
-	return fmt.Sprintf("network error: %s", e.Error())
+	return fmt.Sprintf("network error: %s", e.err.Error())
 }
 
 func newNetworkError(err error) error {
@@ -52,9 +52,21 @@ type jsonError struct {
 }
 
 func (e *jsonError) Error() string {
-	return fmt.Sprintf("json error: %s", e.Error())
+	return fmt.Sprintf("json error: %s", e.err.Error())
 }
 
 func newJsonError(err error) error {
 	return &jsonError{err}
+}
+
+type internalError struct {
+	err error
+}
+
+func (e *internalError) Error() string {
+	return fmt.Sprintf("internal error (report a bug!): %s", e.err.Error())
+}
+
+func newInternalError(err error) error {
+	return &internalError{err}
 }
