@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 func getWhisperConversations(p *Prefs) (map[string]string, error) {
@@ -30,8 +31,8 @@ func getWhisperConversations(p *Prefs) (map[string]string, error) {
 }
 
 func newWhisperConversation(p *Prefs, name string) (string, error) {
-	url := fmt.Sprintf("/profiles/%s/whisper-conversations", p.ProfileId)
-	resp, err := SendRequest(p, url, "POST", nil, name)
+	path := fmt.Sprintf("/profiles/%s/whisper-conversations", p.ProfileId)
+	resp, err := SendRequest(p, path, "POST", nil, name)
 	if err != nil {
 		return "", newNetworkError(err)
 	}
@@ -47,4 +48,40 @@ func newWhisperConversation(p *Prefs, name string) (string, error) {
 		return "", newJsonError(err)
 	}
 	return result, nil
+}
+
+func deleteWhisperConversation(p *Prefs, name string) error {
+	path := fmt.Sprintf("/profiles/%s/whisper-conversations/%s", p.ProfileId, url.PathEscape(name))
+	resp, err := SendRequest(p, path, "DELETE", nil, nil)
+	if err != nil {
+		return newNetworkError(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("whisper conversation %q not found", name)
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		return newServerError(resp.StatusCode, resp.Body)
+	}
+	return nil
+}
+
+func getWhisperConversationId(p *Prefs, name string) (string, error) {
+	path := fmt.Sprintf("/profiles/%s/whisper-conversations/%s", p.ProfileId, url.PathEscape(name))
+	resp, err := SendRequest(p, path, "GET", nil, nil)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", newServerError(resp.StatusCode, resp.Body)
+	}
+	var id string
+	if err := json.NewDecoder(resp.Body).Decode(&id); err != nil {
+		return "", newJsonError(err)
+	}
+	return id, nil
 }

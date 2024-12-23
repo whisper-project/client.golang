@@ -7,7 +7,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,7 +16,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/whisper-project/client.golang/api"
 )
 
 var (
@@ -25,10 +23,17 @@ var (
 	prefsPath = path.Join(homeDir, ".whisper")
 )
 
-type Prefs api.Prefs
+type Prefs struct {
+	ClientId      string `json:"clientId"`
+	ProfileId     string `json:"profileId"`
+	ProfileSecret string `json:"profileSecret"`
+	ProfileEmail  string `json:"profileEmail"`
+	SpeakingOn    bool   `json:"speakingOn"`
+	TypingOff     bool   `json:"typingOff"`
+}
 
 func (p *Prefs) save() error {
-	payload, err := json.Marshal(p)
+	payload, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -36,41 +41,38 @@ func (p *Prefs) save() error {
 }
 
 func (p *Prefs) post() (bool, error) {
-	pnp := *p
-	pnp.ProfileSecret = ""
-	pnp.ProfileEmail = makeSha1(p.ProfileEmail)
-	resp, err := SendRequest(p, "/preferences", "POST", nil, &pnp)
+	resp, err := SendRequest(p, "/preferences", "POST", nil, makeSha1(p.ProfileEmail))
 	if err != nil {
 		return false, newNetworkError(err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNoContent {
+		// profile is complete and authorized
+		return true, nil
+	}
 	if resp.StatusCode == http.StatusForbidden {
-		// we couldn't authorize against the profile, so get a new password
+		// profile is complete but the credentials are wrong
 		return false, nil
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		// we now have the profile, but are being challenged for the password
-		var prefs Prefs
-		err = json.NewDecoder(resp.Body).Decode(&prefs)
+		// server recognized the emailHash and has returned profile ID
+		var profileId string
+		err = json.NewDecoder(resp.Body).Decode(&profileId)
 		if err != nil {
 			return false, newJsonError(err)
 		}
-		p.ProfileId = prefs.ProfileId
+		p.ProfileId = profileId
 		return false, nil
 	}
-	if resp.StatusCode == http.StatusNoContent {
-		// profile is complete and correct
-		return true, nil
-	}
 	if resp.StatusCode == http.StatusCreated {
-		// server created a new profile and returned the password
-		var prefs Prefs
-		err = json.NewDecoder(resp.Body).Decode(&prefs)
+		// server created a new profile for the emailHash and returned it
+		var profile map[string]string
+		err = json.NewDecoder(resp.Body).Decode(&profile)
 		if err != nil {
 			return false, newJsonError(err)
 		}
-		p.ProfileId = prefs.ProfileId
-		p.ProfileSecret = prefs.ProfileSecret
+		p.ProfileId = profile["id"]
+		p.ProfileSecret = profile["secret"]
 		return true, nil
 	}
 	return false, newServerError(resp.StatusCode, resp.Body)
@@ -92,7 +94,9 @@ func (p *Prefs) validate() (bool, error) {
 			return false, err
 		}
 		if authorized {
-			return preAuthSecret == "", nil
+			// if the returned secret is not what we submitted,
+			// then this is a newly-created profile.
+			return preAuthSecret != p.ProfileSecret, nil
 		}
 		// profile exists, but we need the password
 		err = p.collectPassword()
@@ -125,7 +129,7 @@ func (p *Prefs) collectEmail() error {
 	}
 	for {
 		fmt.Print("> Enter your email address (or 'help' for help): ")
-		email, err := readLine()
+		email, err := readLineBuffered()
 		if err != nil {
 			return userCancelledError("Interrupt received!")
 		}
@@ -159,7 +163,7 @@ func (p *Prefs) collectPassword() error {
 	p.ProfileSecret = ""
 	for {
 		fmt.Print("> Enter your password (or 'help' for help): ")
-		password, err := readLine()
+		password, err := readLineBuffered()
 		if err != nil {
 			return userCancelledError("Interrupt received!")
 		}
@@ -237,11 +241,6 @@ func LoadPrefs() (*Prefs, error) {
 	return prefs, nil
 }
 
-func readLine() (string, error) {
-	input := bufio.NewReader(os.Stdin)
-	val, err := input.ReadString('\n')
-	if err != nil {
-		return "", userCancelledError(err.Error())
-	}
-	return strings.TrimSuffix(val, "\n"), nil
+func DeletePrefs() error {
+	return os.Remove(prefsPath)
 }
